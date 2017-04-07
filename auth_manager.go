@@ -176,6 +176,7 @@ func (b DefaultKeyGenerator) GenerateAuthKey(OrgID string) string {
 	return newAuthKey
 }
 
+
 // GenerateHMACSecret is a utility function for generating new auth keys. Returns the storage key name and the actual key
 func (b DefaultKeyGenerator) GenerateHMACSecret() string {
 	u5, _ := uuid.NewV4()
@@ -184,3 +185,5 @@ func (b DefaultKeyGenerator) GenerateHMACSecret() string {
 
 	return newSecret
 }
+
+

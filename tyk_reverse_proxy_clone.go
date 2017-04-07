@@ -17,7 +17,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -663,14 +662,6 @@ func (p *ReverseProxy) HandleResponse(rw http.ResponseWriter, res *http.Response
 	// Close connections
 	if config.CloseConnections {
 		res.Header.Set("Connection", "close")
-	}
-
-	// Add resource headers
-	if ses != nil {
-		// We have found a session, lets report back
-		res.Header.Add("X-RateLimit-Limit", strconv.Itoa(int(ses.QuotaMax)))
-		res.Header.Add("X-RateLimit-Remaining", strconv.Itoa(int(ses.QuotaRemaining)))
-		res.Header.Add("X-RateLimit-Reset", strconv.Itoa(int(ses.QuotaRenews)))
 	}
 
 	copyHeader(rw.Header(), res.Header)

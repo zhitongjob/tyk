@@ -295,16 +295,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			}
 
 			copyHeader(w.Header(), newRes.Header)
-			sessObj := context.Get(r, SessionData)
-			var thisSessionState SessionState
 
-			// Only add ratelimit data to keyed sessions
-			if sessObj != nil {
-				thisSessionState = sessObj.(SessionState)
-				w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(thisSessionState.QuotaMax)))
-				w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(int(thisSessionState.QuotaRemaining)))
-				w.Header().Set("X-RateLimit-Reset", strconv.Itoa(int(thisSessionState.QuotaRenews)))
-			}
 			w.Header().Add("x-tyk-cached-response", "1")
 			w.WriteHeader(newRes.StatusCode)
 			m.Proxy.CopyResponse(w, newRes.Body)

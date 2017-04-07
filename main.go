@@ -18,13 +18,6 @@ import (
 
 	pprof_http "net/http/pprof"
 
-	"github.com/TykTechnologies/goagain"
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/logrus-logstash-hook"
-	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
-	"github.com/TykTechnologies/logrus_sentry"
-	"github.com/TykTechnologies/tykcommon"
-	logger "github.com/TykTechnologies/tykcommon-logger"
 	"github.com/docopt/docopt.go"
 	"github.com/facebookgo/pidfile"
 	"github.com/gorilla/mux"
@@ -33,6 +26,14 @@ import (
 	osin "github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"rsc.io/letsencrypt"
+
+	"github.com/TykTechnologies/goagain"
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/logrus-logstash-hook"
+	logrus_syslog "github.com/TykTechnologies/logrus/hooks/syslog"
+	"github.com/TykTechnologies/logrus_sentry"
+	"github.com/TykTechnologies/tykcommon"
+	logger "github.com/TykTechnologies/tykcommon-logger"
 )
 
 var log = logger.GetLogger()
@@ -250,14 +251,14 @@ func getAPISpecs() *[]*APISpec {
 	}).Printf("Detected %v APIs", len(*APISpecs))
 
 	if config.AuthOverride.ForceAuthProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].AuthProvider = config.AuthOverride.AuthProvider
 
 		}
 	}
 
 	if config.AuthOverride.ForceSessionProvider {
-		for i, _ := range *APISpecs {
+		for i := range *APISpecs {
 			(*APISpecs)[i].SessionProvider = config.AuthOverride.SessionProvider
 		}
 	}
@@ -890,7 +891,7 @@ func setupLogger() {
 func initialiseSystem(arguments map[string]interface{}) {
 
 	// Enable command mode
-	for k, _ := range CommandModeOptions {
+	for k := range CommandModeOptions {
 
 		v := arguments[k]
 
@@ -1342,6 +1343,25 @@ func StartDRL() {
 	}).Info("Initialising distributed rate limiter")
 	SetupDRL()
 	StartRateLimitNotifications()
+
+	if config.UseDistributedQuotaCounter {
+		// Start the distributed quota system
+		StartDQ(DecideLeaderMechanism())
+	}
+}
+
+// In case we want to use a channel or some other leadership checker
+func DecideLeaderMechanism() GetLeaderStatusFunc {
+	switch config.Storage.Type {
+	case "redis":
+		// For redis we should distribute write in order to retain consistency
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Warning("If using redis with distributed quota it is recommended to make all gateways leader")
+		return func() bool { return config.DQSetMaster }
+	default:
+		return func() bool { return config.DQSetMaster }
+	}
 }
 
 func listen(l net.Listener, err error) {

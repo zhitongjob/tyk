@@ -14,11 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/logrus"
-	"github.com/TykTechnologies/tykcommon"
 	"github.com/gorilla/context"
 	"github.com/nu7hatch/gouuid"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/TykTechnologies/logrus"
+	"github.com/TykTechnologies/tykcommon"
 )
 
 // APIModifyKeySuccess represents when a Key modification was successful
@@ -106,7 +107,7 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 
 	if len(newSession.AccessRights) > 0 {
 		// We have a specific list of access rules, only add / update those
-		for apiId, _ := range newSession.AccessRights {
+		for apiId := range newSession.AccessRights {
 			thisAPISpec := GetSpecForApi(apiId)
 			if thisAPISpec != nil {
 
@@ -116,6 +117,9 @@ func doAddOrUpdate(keyName string, newSession SessionState, dontReset bool) erro
 				if !thisAPISpec.DontSetQuotasOnCreate {
 					// Reset quote by default
 					if !dontReset {
+						if config.UseDistributedQuotaCounter {
+							QuotaHandler.TagDelete(keyName)
+						}
 						thisAPISpec.SessionManager.ResetQuota(keyName, newSession)
 						newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
 					}
@@ -246,7 +250,7 @@ func handleAddOrUpdate(keyName string, r *http.Request) ([]byte, int) {
 				// Ge the session
 				var originalKey SessionState
 				var found bool
-				for api_id, _ := range newSession.AccessRights {
+				for api_id := range newSession.AccessRights {
 					originalKey, found = GetKeyDetail(keyName, api_id)
 					if found {
 						break
@@ -1330,7 +1334,7 @@ func createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 
 			if len(newSession.AccessRights) > 0 {
-				for apiId, _ := range newSession.AccessRights {
+				for apiId := range newSession.AccessRights {
 					thisAPISpec := GetSpecForApi(apiId)
 					if thisAPISpec != nil {
 						checkAndApplyTrialPeriod(newKey, apiId, &newSession)

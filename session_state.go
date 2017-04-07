@@ -3,10 +3,12 @@
 package main
 
 import (
-	"github.com/spaolacci/murmur3"
-	"gopkg.in/vmihailenco/msgpack.v2"
 	"fmt"
 	"hash"
+	"time"
+
+	"github.com/spaolacci/murmur3"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type HashType string
@@ -65,13 +67,27 @@ type SessionState struct {
 	Tags                    []string    `json:"tags" msg:"tags"`
 	Alias                   string      `json:"alias" msg:"alias"`
 	LastUpdated             string      `json:"last_updated" msg:"last_updated"`
-	IdExtractorDeadline		int64	`json:"id_extractor_deadline" msg:"id_extractor_deadline"`
+	IdExtractorDeadline     int64       `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64       `bson:"session_lifetime" json:"session_lifetime"`
 
 	firstSeenHash string
 }
 
 var murmurHasher hash.Hash32 = murmur3.New32()
+
+func (s *SessionState) IsExpired() bool {
+	if time.Now().After(time.Unix(s.Expires, 0)) {
+		return true
+	}
+	return false
+}
+
+func (s *SessionState) IsQuotaExpired() bool {
+	if time.Now().After(time.Unix(s.QuotaRenews, 0)) {
+		return true
+	}
+	return false
+}
 
 func (s *SessionState) SetFirstSeenHash() {
 	encoded, err := msgpack.Marshal(s)
@@ -80,7 +96,7 @@ func (s *SessionState) SetFirstSeenHash() {
 		return
 	}
 
-    s.firstSeenHash = fmt.Sprintf("%x", murmurHasher.Sum(encoded))
+	s.firstSeenHash = fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
 func (s *SessionState) GetHash() string {
@@ -90,7 +106,7 @@ func (s *SessionState) GetHash() string {
 		return ""
 	}
 
-    return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
+	return fmt.Sprintf("%x", murmurHasher.Sum(encoded))
 }
 
 func (s *SessionState) HasChanged() bool {
