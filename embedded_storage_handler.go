@@ -10,41 +10,74 @@ import (
 	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
 )
 
-var KeyValueStore *DistributedKVStore
+var embeddedKVStore *tcf.DistributedStore
 
 type DistributedKVStore struct {
-	KeyPrefix   string
-	HashKeys    bool
-	StoreConfig *rafty.Config
-	Store       *tcf.DistributedStore
-	beacon      client.Client
+	KeyPrefix string
+	HashKeys  bool
+}
+
+func InitDistributedStore(config *rafty.Config) error {
+	var err error
+	var beacon client.Client
+
+	if !config.RunInSingleServerMode {
+		if beacon, err = client.NewClient("beacon://127.0.0.1:9999?interval=1", encoding.JSON); err != nil {
+			log.Fatal("Could not create a beacon: ", err)
+			return err
+		}
+	}
+
+	if config.JoinTimeout == 0 {
+		config.JoinTimeout = 5
+	}
+
+	if config.RaftDir == "" {
+		config.RaftDir = "./raft"
+	}
+
+	if config.HttpServerAddr == "" {
+		config.HttpServerAddr = "127.0.0.1:11100"
+	}
+
+	if config.RaftServerAddress == "" {
+		config.RaftServerAddress = "127.0.0.1:11200"
+	}
+
+	if !config.ResetPeersOnLoad {
+		config.ResetPeersOnLoad = true
+	}
+
+	// TODO: remove this
+	log.Warning("====== K/V TLS IS FORCIBLY DISBLED ======")
+	config.TLSConfig = nil
+
+	embeddedKVStore, err = tcf.NewDistributedStore(config)
+	if err != nil {
+		log.Fatal("Failed to create a new distributed store: ", err)
+		return err
+	}
+
+	embeddedKVStore.Start("", beacon)
+	return nil
 }
 
 func (d *DistributedKVStore) Connect() bool {
-	if d.Store != nil {
-		d.Store.Stop()
-		d.beacon.Stop()
+	if embeddedKVStore == nil {
+		log.Info("STARTING KV STORE")
+		if err := InitDistributedStore(&config.EmbeddedKV); err != nil {
+			log.Error(err)
+			return false
+		}
+		return true
 	}
 
-	var err error
-
-	if d.beacon, err = client.NewClient("beacon://0.0.0.0:9999?interval=1", encoding.JSON); err != nil {
-		log.Fatal("Could not create a beacon: ", err)
-		return false
-	}
-
-	d.Store, err = tcf.NewDistributedStore(d.StoreConfig)
-	if err != nil {
-		log.Fatal("Failed to create a new distributed store: ", err)
-		return false
-	}
-
-	d.Store.Start("", d.beacon)
+	log.Info("K/V Store already initialised, skipping")
 	return true
 }
 
 func (d *DistributedKVStore) getKey(k string) (string, error) {
-	v, err := d.Store.StorageAPI.GetKey(k)
+	v, err := embeddedKVStore.StorageAPI.GetKey(k)
 	if err != nil {
 		return "", err
 	}
@@ -62,11 +95,14 @@ func (d *DistributedKVStore) GetRawKey(k string) (string, error) {
 }
 
 func (d *DistributedKVStore) setKey(k string, v string, ttl int64) error {
-	_, err := d.Store.StorageAPI.UpdateKey(k, v, int(ttl))
-	if strings.Contains(err.Error(), "Not found") {
-		if _, err := d.Store.StorageAPI.CreateKey(k, v, int(ttl)); err != nil {
-			return err
-		}
+	_, err := embeddedKVStore.StorageAPI.GetKey(k)
+	if err == nil {
+		_, err := embeddedKVStore.StorageAPI.UpdateKey(k, v, int(ttl))
+		return err
+	}
+
+	if _, err := embeddedKVStore.StorageAPI.CreateKey(k, v, int(ttl)); err != nil {
+		return err
 	}
 
 	return nil
@@ -82,7 +118,7 @@ func (d *DistributedKVStore) SetRawKey(k string, v string, ttl int64) error {
 }
 
 func (d *DistributedKVStore) deleteKey(k string) bool {
-	_, err := d.Store.StorageAPI.DeleteKey(k)
+	_, err := embeddedKVStore.StorageAPI.DeleteKey(k)
 	if err != nil {
 		log.Error("Delete failed: ", err)
 		return false
@@ -125,6 +161,9 @@ func (d *DistributedKVStore) AddToSet(k string, v string) {
 	}
 
 	// This is to ensure only one instance of the object is ever stored, like a redis set
+	if set == nil {
+		set = make(map[string]string)
+	}
 	set[v] = v
 
 	j, err := json.Marshal(set)
@@ -132,7 +171,7 @@ func (d *DistributedKVStore) AddToSet(k string, v string) {
 		log.Error("Failed to encode back to set: ", err)
 	}
 
-	_, err = d.Store.StorageAPI.UpdateKey(k, string(j), 0)
+	_, err = embeddedKVStore.StorageAPI.UpdateKey(k, string(j), 0)
 	if err != nil {
 		log.Error("Failed to update set: ", err)
 	}
@@ -153,7 +192,7 @@ func (d *DistributedKVStore) RemoveFromSet(k string, v string) {
 		log.Error("Failed to encode back to set: ", err)
 	}
 
-	_, err = d.Store.StorageAPI.UpdateKey(k, string(j), 0)
+	_, err = embeddedKVStore.StorageAPI.UpdateKey(k, string(j), 0)
 	if err != nil {
 		log.Error("Failed to update set: ", err)
 	}
@@ -202,7 +241,7 @@ func (d *DistributedKVStore) hashKey(in string) string {
 func (d *DistributedKVStore) fixKey(keyName string) string {
 	setKeyName := d.KeyPrefix + d.hashKey(keyName)
 
-	log.Debug("Input key was: ", setKeyName)
+	log.Info("Input key was: ", setKeyName)
 
 	return setKeyName
 }

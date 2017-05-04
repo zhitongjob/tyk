@@ -10,6 +10,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/satori/go.uuid"
 
+	"github.com/TykTechnologies/tyk-cluster-framework/distributed_store/rafty"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -230,6 +231,8 @@ type Config struct {
 	LegacyEnableAllowanceCountdown    bool                                  `bson:"legacy_enable_allowance_countdown" json:"legacy_enable_allowance_countdown"`
 	MaxIdleConnsPerHost               int                                   `bson:"max_idle_connections_per_host" json:"max_idle_connections_per_host"`
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
+	EnableEmbeddedKV                  bool                                  `bson:"enable_embedded_storage" json:"enable_embedded_storage"`
+	EmbeddedKV                        rafty.Config                          `bson:"embedded_storage" json:"embedded_storage"`
 }
 
 type CertData struct {
@@ -306,6 +309,14 @@ func loadConfig(filePath string, conf *Config) {
 	GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
+
+	// For testing only
+	config.EnableEmbeddedKV = true
+	config.EmbeddedKV.RunInSingleServerMode = true
+	config.EmbeddedKV.TLSConfig = nil
+	config.EmbeddedKV.HttpServerAddr = "127.0.0.1:11100"
+	config.EmbeddedKV.RaftServerAddress = "127.0.0.1:11200"
+	config.EmbeddedKV.ResetPeersOnLoad = true
 }
 
 func (c *Config) loadIgnoredIPs() {

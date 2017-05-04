@@ -562,13 +562,32 @@ func testName(t *testing.T) string {
 	return v.FieldByName("name").String()
 }
 
+var initOnce bool
+
 func createSpecTest(t *testing.T, def string) *APISpec {
+	spec := createDefinitionFromString(def)
+	tname := testName(t)
+	redisStore := &DistributedKVStore{KeyPrefix: tname + "-apikey."}
+	healthStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apihealth."}
+	orgStore := &DistributedKVStore{KeyPrefix: tname + "-orgKey."}
+	spec.Init(redisStore, redisStore, healthStore, orgStore)
+
+	if !initOnce {
+		time.Sleep(10 * time.Second)
+		initOnce = true
+		fmt.Println("CONTINUING")
+	}
+	return spec
+}
+
+func createRedisSpecTest(t *testing.T, def string) *APISpec {
 	spec := createDefinitionFromString(def)
 	tname := testName(t)
 	redisStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apikey."}
 	healthStore := &RedisClusterStorageManager{KeyPrefix: tname + "-apihealth."}
 	orgStore := &RedisClusterStorageManager{KeyPrefix: tname + "-orgKey."}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
+
 	return spec
 }
 
@@ -728,7 +747,7 @@ func TestWhitelistRequestReply(t *testing.T) {
 }
 
 func TestQuota(t *testing.T) {
-	spec := createSpecTest(t, nonExpiringDefNoWhiteList)
+	spec := createRedisSpecTest(t, nonExpiringDefNoWhiteList)
 	session := createQuotaSession()
 	keyId := testKey(t, "key")
 	spec.SessionManager.UpdateSession(keyId, session, 60)

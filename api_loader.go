@@ -28,18 +28,6 @@ type ChainObject struct {
 
 var ListenPathMap cmap.ConcurrentMap
 
-func prepareStorage() (*RedisClusterStorageManager, *RedisClusterStorageManager, *RedisClusterStorageManager, *RPCStorageHandler, *RPCStorageHandler) {
-	redisStore := RedisClusterStorageManager{KeyPrefix: "apikey-", HashKeys: config.HashKeys}
-	redisOrgStore := RedisClusterStorageManager{KeyPrefix: "orgkey."}
-	healthStore := &RedisClusterStorageManager{KeyPrefix: "apihealth."}
-	rpcAuthStore := RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: config.HashKeys, UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-	rpcOrgStore := RPCStorageHandler{KeyPrefix: "orgkey.", UserKey: config.SlaveOptions.APIKey, Address: config.SlaveOptions.ConnectionString}
-
-	FallbackKeySesionManager.Init(&redisStore)
-
-	return &redisStore, &redisOrgStore, healthStore, &rpcAuthStore, &rpcOrgStore
-}
-
 func prepareSortOrder(apiSpecs []*APISpec) {
 	sort.Sort(SortableAPISpecListByHost(apiSpecs))
 	sort.Sort(SortableAPISpecListByListen(apiSpecs))
