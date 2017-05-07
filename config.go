@@ -311,6 +311,8 @@ func loadConfig(filePath string, conf *Config) {
 	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
 
 	// For testing only
+	// TODO: Remove these!!
+	log.Warning("HARD CODED VALUES AR ESTILL IN PLACE REMOVE ME NOW!")
 	config.EnableEmbeddedKV = true
 	config.EmbeddedKV.RunInSingleServerMode = true
 	config.EmbeddedKV.TLSConfig = nil
