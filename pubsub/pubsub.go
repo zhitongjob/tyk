@@ -55,6 +55,10 @@ func (c *PSClient) onDisconnect() error {
 	return c.Start(c.cs)
 }
 
+func (c *PSClient) Client() client.Client {
+	return c.client
+}
+
 // Start will terminate any existing connections, and start a new client,
 // if there are already any message handlers that have been registered, it will re-create them.
 func (c *PSClient) Start(cs string) error {
@@ -69,6 +73,7 @@ func (c *PSClient) Start(cs string) error {
 
 	// Create a new client from scratch because we might be reconnecting
 	mc, err := client.NewClient(c.cs, encoding.JSON)
+	fmt.Println("-------- CREATING NEW TCF CONNECTION ---------")
 	if err != nil {
 		c.isConnected = false
 		return err

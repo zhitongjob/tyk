@@ -143,6 +143,7 @@ func (b *DefaultSessionManager) GetSessionDetail(keyName string) (SessionState, 
 
 	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
+		log.Error("Data was: ", jsonKeyVal)
 		return session, false
 	}
 

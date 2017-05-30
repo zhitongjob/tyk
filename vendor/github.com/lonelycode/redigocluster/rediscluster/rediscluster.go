@@ -115,7 +115,7 @@ func (self *RedisCluster) populateSlotsCache() {
 					// add to handles if not in handles
 					self.addRedisHandleIfNeeded(item.Key)
 
-					slots := fields[8:len(fields)]
+					slots := fields[8:]
 					for _, s_range := range slots {
 						slot_range := s_range
 						if slot_range != "[" {

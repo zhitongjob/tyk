@@ -7,6 +7,7 @@ import (
 // RedisNotifier will use redis pub/sub channels to send notifications
 type TCFNotifier struct {
 	channel string
+	debug   bool
 }
 
 // Notify will send a notification to a channel
@@ -16,7 +17,10 @@ func (r *TCFNotifier) Notify(notification interface{}) bool {
 		log.Error("Problem marshalling notification: ", err)
 		return false
 	}
-	log.Debug("Sending notification", notification)
+
+	if r.debug {
+		log.Info("Sending notification", notification)
+	}
 
 	if PubSubClient == nil {
 		log.Warning("Client is nil, can't send notification")

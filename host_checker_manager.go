@@ -18,13 +18,15 @@ var GlobalHostChecker HostCheckerManager
 
 type HostCheckerManager struct {
 	Id                string
-	store             *RedisClusterStorageManager
+	store             StorageHandler
+	analyticsStore    *RedisClusterStorageManager
 	checker           *HostUptimeChecker
 	stopLoop          bool
 	pollerStarted     bool
 	unhealthyHostList map[string]bool
 	currentHostList   map[string]HostData
 	resetsInitiated   map[string]bool
+	Leader            bool
 }
 
 type UptimeReportData struct {
@@ -67,8 +69,9 @@ const (
 	UptimeAnalytics_KEYNAME = "tyk-uptime-analytics"
 )
 
-func (hc *HostCheckerManager) Init(store *RedisClusterStorageManager) {
+func (hc *HostCheckerManager) Init(store StorageHandler, analyticsStore *RedisClusterStorageManager) {
 	hc.store = store
+	hc.analyticsStore = analyticsStore
 	hc.unhealthyHostList = make(map[string]bool)
 	hc.resetsInitiated = make(map[string]bool)
 	// Generate a new ID for ourselves
@@ -95,6 +98,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
 			}).Debug("Stopping uptime tests")
+			hc.Leader = false
 			break
 		}
 
@@ -107,6 +111,8 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 				hc.pollerStarted = true
 				hc.StartPoller()
 			}
+			log.Info("I am leader")
+			hc.Leader = true
 		} else {
 			log.WithFields(logrus.Fields{
 				"prefix": "host-check-mgr",
@@ -115,6 +121,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 				hc.StopPoller()
 				hc.pollerStarted = false
 			}
+			hc.Leader = false
 		}
 
 		time.Sleep(10 * time.Second)
@@ -134,7 +141,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Debug("No Primary instance found, assuming control")
+		}).Info("No Primary instance found, assuming control")
 		hc.store.SetKey(PollerCacheKey, hc.Id, 15)
 		return true
 	}
@@ -142,17 +149,17 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	if activeInstance == hc.Id {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Debug("Primary instance set, I am master")
+		}).Info("Primary instance set, I am master")
 		hc.store.SetKey(PollerCacheKey, hc.Id, 15) // Reset TTL
 		return true
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Debug("Active Instance is: ", activeInstance)
+	}).Info("Active Instance is: ", activeInstance)
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Debug("--- I am: ", hc.Id)
+	}).Info("--- I am: ", hc.Id)
 
 	return false
 }
@@ -483,19 +490,23 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
 	}).Debug("Recording uptime stat")
-	hc.store.AppendToSet(UptimeAnalytics_KEYNAME, string(encoded))
+	hc.analyticsStore.AppendToSet(UptimeAnalytics_KEYNAME, string(encoded))
 	return nil
 }
 
-func InitHostCheckManager(store *RedisClusterStorageManager) {
+func InitHostCheckManager(store StorageHandler, as *RedisClusterStorageManager) {
 	// Already initialized
 	if GlobalHostChecker.Id != "" {
 		return
 	}
 
 	GlobalHostChecker = HostCheckerManager{}
-	GlobalHostChecker.Init(store)
-	GlobalHostChecker.Start()
+	GlobalHostChecker.Init(store, as)
+
+	go func() {
+		time.Sleep(15 * time.Second)
+		GlobalHostChecker.Start()
+	}()
 }
 
 func SetCheckerHostList() {

@@ -21,7 +21,7 @@ func (mv Map) Root() (string, error) {
 	if len(mm) != 1 {
 		return "", fmt.Errorf("Map does not have singleton root. Len: %d.", len(mm))
 	}
-	for k, _ := range mm {
+	for k := range mm {
 		return k, nil
 	}
 	return "", nil
@@ -40,7 +40,7 @@ func (mv Map) Elements(path string) ([]string, error) {
 		ee := e.(map[string]interface{})
 		elems := make([]string, len(ee))
 		var i int
-		for k, _ := range ee {
+		for k := range ee {
 			if len(attrPrefix) > 0 && strings.Index(k, attrPrefix) == 0 {
 				continue // skip attributes
 			}
@@ -70,7 +70,7 @@ func (mv Map) Attributes(path string) ([]string, error) {
 		aa := a.(map[string]interface{})
 		attrs := make([]string, len(aa))
 		var i int
-		for k, _ := range aa {
+		for k := range aa {
 			if len(attrPrefix) == 0 || strings.Index(k, attrPrefix) != 0 {
 				continue // skip non-attributes
 			}

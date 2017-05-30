@@ -22,7 +22,7 @@ func InitDistributedStore(config *rafty.Config) error {
 	var beacon client.Client
 
 	if !config.RunInSingleServerMode {
-		if beacon, err = client.NewClient("beacon://127.0.0.1:9999?interval=1", encoding.JSON); err != nil {
+		if beacon, err = client.NewClient("beacon://0.0.0.0:11500/?interval=2", encoding.JSON); err != nil {
 			log.Fatal("Could not create a beacon: ", err)
 			return err
 		}
@@ -82,7 +82,13 @@ func (d *DistributedKVStore) getKey(k string) (string, error) {
 		return "", err
 	}
 
-	return v.Node.Value, nil
+	// The value element is a string, we need to unpack it first
+	var asStr string
+	if e := json.Unmarshal([]byte(v.Node.Value), &asStr); e != nil {
+		return "", err
+	}
+
+	return asStr, nil
 }
 
 func (d *DistributedKVStore) GetKey(k string) (string, error) {

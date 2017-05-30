@@ -125,10 +125,6 @@ func setupGlobals() {
 		}).Panic("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
-	// Initialise our Host Checker
-	healthCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
-	InitHostCheckManager(healthCheckStore)
-
 	if config.EnableAnalytics {
 		config.loadIgnoredIPs()
 		analyticsStore := RedisClusterStorageManager{KeyPrefix: "analytics-"}
@@ -1056,6 +1052,19 @@ func main() {
 		log.Info("Terminated from fork.")
 	}
 
+	if config.EnableEmbeddedKV {
+		embeddedKVStore.Stop()
+	}
+
+	if config.PubSubMasterConnectionString != "" {
+		if err := PubSubClient.Stop(); err != nil {
+			log.Error(err)
+		}
+	}
+
+	if config.UseDistributedQuotaCounter {
+		QuotaHandler.Stop()
+	}
 	time.Sleep(3 * time.Second)
 }
 
@@ -1239,6 +1248,11 @@ func startDRL() {
 	setupDRL()
 	startRateLimitNotifications()
 
+	// Initialise our Host Checker
+	healthAnalyticsCheckStore := &RedisClusterStorageManager{KeyPrefix: "host-checker:"}
+	healthCheckStore := &DistributedKVStore{KeyPrefix: "host-checker:"}
+	InitHostCheckManager(healthCheckStore, healthAnalyticsCheckStore)
+
 	if config.UseDistributedQuotaCounter {
 		// Start the distributed quota system
 		startDQ(decideLeaderMechanism())
@@ -1247,6 +1261,15 @@ func startDRL() {
 
 // In case we want to use a channel or some other leadership checker
 func decideLeaderMechanism() GetLeaderStatusFunc {
+	if config.EnableEmbeddedKV && !config.UptimeTests.Disable {
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Info("Using uptime poller to decide DQ leader")
+		return func() bool {
+			return GlobalHostChecker.Leader
+		}
+	}
+
 	switch config.Storage.Type {
 	case "redis":
 		// For redis we should distribute write in order to retain consistency

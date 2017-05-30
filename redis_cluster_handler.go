@@ -514,7 +514,6 @@ func (r *RedisClusterStorageManager) GetSet(keyName string) (map[string]string, 
 	return vals, nil
 }
 
-
 func (r *RedisClusterStorageManager) AddToSet(keyName, value string) {
 	log.Debug("Pushing to raw key set: ", keyName)
 	log.Debug("Pushing to fixed key set: ", r.fixKey(keyName))

@@ -157,7 +157,7 @@ func (s *StatsDSink) loop() {
 
 	ticker := time.NewTicker(s.flushPeriod)
 	go func() {
-		for _ = range ticker.C {
+		for range ticker.C {
 			cmdChan <- statsdEmitCmd{Kind: statsdCmdKindFlush}
 		}
 	}()

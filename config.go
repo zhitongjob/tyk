@@ -315,15 +315,15 @@ func loadConfig(filePath string, conf *Config) {
 	GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	conf.EventTriggers = InitGenericEventHandlers(conf.EventHandlers)
 
-	// For testing only
-	// TODO: Remove these!!
-	log.Warning("HARD CODED VALUES AR ESTILL IN PLACE REMOVE ME NOW!")
-	config.EnableEmbeddedKV = true
-	config.EmbeddedKV.RunInSingleServerMode = true
-	config.EmbeddedKV.TLSConfig = nil
-	config.EmbeddedKV.HttpServerAddr = "127.0.0.1:11100"
-	config.EmbeddedKV.RaftServerAddress = "127.0.0.1:11200"
-	config.EmbeddedKV.ResetPeersOnLoad = true
+	//// For testing only
+	//// TODO: Remove these!!
+	//log.Warning("HARD CODED VALUES AR ESTILL IN PLACE REMOVE ME NOW!")
+	//config.EnableEmbeddedKV = true
+	//config.EmbeddedKV.RunInSingleServerMode = false
+	//config.EmbeddedKV.TLSConfig = nil
+	//config.EmbeddedKV.HttpServerAddr = "127.0.0.1:11100"
+	//config.EmbeddedKV.RaftServerAddress = "127.0.0.1:11200"
+	//config.EmbeddedKV.ResetPeersOnLoad = true
 }
 
 func (c *Config) loadIgnoredIPs() {

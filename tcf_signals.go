@@ -40,6 +40,8 @@ func handleNotificationEvent(v payloads.Payload, handled func(NotificationComman
 		return
 	}
 
+	log.Debug("Received: ", notif)
+
 	// Add messages to ignore here
 	switch notif.Command {
 	case NoticeGatewayConfigResponse:

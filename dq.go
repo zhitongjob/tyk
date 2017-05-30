@@ -127,17 +127,30 @@ func startDQ(statusFunc GetLeaderStatusFunc) {
 	log.WithFields(logrus.Fields{
 		"prefix": "DQuota",
 	}).Info("Using Distributed Quota")
-	p := strconv.Itoa(config.Storage.Port)
-	cs := fmt.Sprintf("redis://%v:%v", config.Storage.Host, p)
-	c1, err := client.NewClient(cs, encoding.JSON)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "DQuota",
-		}).Error("Failed to create distributed quota client: ", err)
+
+	var c1 client.Client
+	var err error
+	if config.PubSubMasterConnectionString != "" {
+		c1 = PubSubClient.Client()
+	} else {
+		p := strconv.Itoa(config.Storage.Port)
+		cs := fmt.Sprintf("redis://%v:%v", config.Storage.Host, p)
+		c1, err = client.NewClient(cs, encoding.JSON)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "DQuota",
+			}).Fatal("Failed to create distributed quota client: ", err)
+		}
+
+		// DQ Assumes a connected client
+		err := c1.Connect()
+		if err != nil {
+			log.Fatal("Failed to connect DQ pub/sub client")
+		}
 	}
 
 	QuotaHandler = dq.NewDQ(dqFlusher, dqErrorHandler, NodeID)
-	broadcastTimer := time.Millisecond * 100
+	broadcastTimer := time.Millisecond * 500
 	QuotaHandler.BroadcastWith(c1, broadcastTimer, getDQTopic())
 
 	// We always need a leader because otherwise we can;t persist data
@@ -154,8 +167,17 @@ func startDQ(statusFunc GetLeaderStatusFunc) {
 		log.Fatal(err)
 	}
 
+	go stillDQLeader(statusFunc)
+
 	// Give us time to catch with the cluster
 	time.Sleep(broadcastTimer)
+}
+
+func stillDQLeader(statusFunc GetLeaderStatusFunc) {
+	for {
+		QuotaHandler.SetLeader(statusFunc())
+		time.Sleep(QuotaHandler.FlushInterval)
+	}
 }
 
 func (l SessionLimiter) IsDistributedQuotaExceeded(currentSession *SessionState, key string) bool {

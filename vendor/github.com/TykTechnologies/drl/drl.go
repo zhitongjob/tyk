@@ -50,7 +50,7 @@ func (d *DRL) totalLoadAcrossServers() int64 {
 	var total int64
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	for sID, _ := range d.serverIndex {
+	for sID := range d.serverIndex {
 		_, found := d.Servers.GetNoExtend(sID)
 		if found {
 			total += d.serverIndex[sID].LoadPerSec
@@ -64,7 +64,7 @@ func (d *DRL) totalLoadAcrossServers() int64 {
 
 func (d *DRL) cleanServerList() {
 	toRemove := map[string]bool{}
-	for sID, _ := range d.serverIndex {
+	for sID := range d.serverIndex {
 		_, found := d.Servers.GetNoExtend(sID)
 		//fmt.Printf("Checking: %v found? %v\n", sID, found)
 		if !found {
@@ -73,7 +73,7 @@ func (d *DRL) cleanServerList() {
 	}
 
 	// Update the server list
-	for sID, _ := range toRemove {
+	for sID := range toRemove {
 		delete(d.serverIndex, sID)
 	}
 }
@@ -81,7 +81,7 @@ func (d *DRL) cleanServerList() {
 func (d *DRL) percentagesAcrossServers() {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
-	for sID, _ := range d.serverIndex {
+	for sID := range d.serverIndex {
 		_, found := d.Servers.GetNoExtend(sID)
 		if found {
 			thisServerObject := d.serverIndex[sID]
