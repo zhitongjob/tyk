@@ -209,6 +209,84 @@ func (a *APIDefinitionLoader) readBody(response *http.Response) ([]byte, error) 
 	return ioutil.ReadAll(response.Body)
 }
 
+// LoadDefinitionsFromKV will load API Definitions from the local embedded k/v store
+func (a *APIDefinitionLoader) LoadDefinitionsFromKV() []*APISpec {
+	var val string
+	var err error
+
+	log.Info("====== LOADING APIS FROM K/V Store ======")
+
+	kvHandler := DistributedKVStore{KeyPrefix: "apidefs-"}
+	if val, err = kvHandler.GetKey("dashboard-set"); err != nil {
+		log.Fatal("Failed to load APIs: ", err)
+	}
+
+	// Extract tagged APIs#
+	type ResponseStruct struct {
+		ApiDefinition *apidef.APIDefinition `bson:"api_definition" json:"api_definition"`
+	}
+	type NodeResponseOK struct {
+		Status  string
+		Message []ResponseStruct
+		Nonce   string
+	}
+
+	log.Info("GOT DATA FROM KV STORE: ", string(val))
+
+	list := NodeResponseOK{}
+	if err := json.Unmarshal([]byte(val), &list); err != nil {
+		log.Info("Failed to decode k/v body: ", err, " data was: ", val)
+		log.Info("--> Retrying in 5s")
+		return nil
+	}
+
+	rawList := make(map[string]interface{})
+	if err := json.Unmarshal([]byte(val), &rawList); err != nil {
+		log.Error("Failed to decode k/v body (raw): ", err)
+		return nil
+	}
+
+	// Extract tagged entries only
+	apiDefs := make([]*apidef.APIDefinition, 0)
+
+	if config.DBAppConfOptions.NodeIsSegmented {
+		tagList := make(map[string]bool, len(config.DBAppConfOptions.Tags))
+		toLoad := make(map[string]*apidef.APIDefinition)
+
+		for _, mt := range config.DBAppConfOptions.Tags {
+			tagList[mt] = true
+		}
+
+		for index, apiEntry := range list.Message {
+			for _, t := range apiEntry.ApiDefinition.Tags {
+				if tagList[t] {
+					apiEntry.ApiDefinition.RawData = rawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
+					toLoad[apiEntry.ApiDefinition.APIID] = apiEntry.ApiDefinition
+				}
+
+			}
+		}
+
+		for _, apiDef := range toLoad {
+			apiDefs = append(apiDefs, apiDef)
+		}
+	} else {
+		for index, apiEntry := range list.Message {
+			apiEntry.ApiDefinition.RawData = rawList["Message"].([]interface{})[index].(map[string]interface{})["api_definition"].(map[string]interface{})
+			apiDefs = append(apiDefs, apiEntry.ApiDefinition)
+		}
+	}
+
+	// Process
+	var apiSpecs []*APISpec
+	for _, appConfig := range apiDefs {
+		newAppSpec := a.MakeSpec(appConfig)
+		apiSpecs = append(apiSpecs, newAppSpec)
+	}
+
+	return apiSpecs
+}
+
 // LoadDefinitionsFromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a *APIDefinitionLoader) LoadDefinitionsFromDashboardService(endpoint, secret string) []*APISpec {
 	// Get the definitions

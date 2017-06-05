@@ -211,3 +211,62 @@ func LoadPoliciesFromRPC(orgId string) map[string]Policy {
 
 	return policies
 }
+
+// LoadPoliciesFromDashboard will connect and download Policies from a Tyk Dashboard instance.
+func LoadPoliciesFromKVStore(allowExplicit bool) map[string]Policy {
+
+	// Extract Policies
+	type NodeResponseOK struct {
+		Status  string
+		Message []DBPolicy
+		Nonce   string
+	}
+
+	list := NodeResponseOK{}
+	var val string
+	var err error
+
+	log.Info("====== LOADING APIS FROM K/V Store ======")
+
+	kvHandler := DistributedKVStore{KeyPrefix: "policies-"}
+	if val, err = kvHandler.GetKey("dashboard-set"); err != nil {
+		log.Fatal("Failed to load policies: ", err)
+	}
+
+	if err := json.Unmarshal([]byte(val), &list); err != nil {
+		log.Error("Failed to decode policy body: ", err, "Returned: ", val)
+
+		return nil
+	}
+
+	policies := make(map[string]Policy, len(list.Message))
+
+	log.WithFields(logrus.Fields{
+		"prefix": "policy",
+	}).Info("Processing policy list")
+	for _, p := range list.Message {
+		id := p.MID.Hex()
+		if allowExplicit {
+			if p.ID != "" {
+				id = p.ID
+			}
+		}
+		p.ID = id
+		_, foundP := policies[id]
+		if !foundP {
+			policies[id] = p.ToRegularPolicy()
+			log.WithFields(logrus.Fields{
+				"prefix": "policy",
+			}).Info("--> Processing policy ID: ", p.ID)
+			log.Debug("POLICY ACCESS RIGHTS: ", p.AccessRights)
+		} else {
+			log.WithFields(logrus.Fields{
+				"prefix":   "policy",
+				"policyID": p.ID,
+				"OrgID":    p.OrgID,
+			}).Warning("--> Skipping policy, new item has a duplicate ID!")
+		}
+	}
+
+	return policies
+}

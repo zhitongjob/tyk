@@ -65,6 +65,21 @@ func (h *HTTPDashboardHandler) Init() error {
 	return nil
 }
 
+var failCount int
+
+func (h *HTTPDashboardHandler) handleFailure() error {
+	if config.EnableEmbeddedKV {
+		failCount += 1
+		if failCount > 3 {
+			log.Warning("Failed to reach dashboard after 3 attempts, falling through")
+			failCount = 0
+			return nil
+		}
+	}
+
+	return h.Register()
+}
+
 func (h *HTTPDashboardHandler) Register() error {
 	// Get the definitions
 
@@ -87,7 +102,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	if err != nil {
 		log.Error("Request failed: ", err)
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.handleFailure()
 	}
 
 	defer response.Body.Close()
@@ -96,7 +111,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	if response.StatusCode != 200 {
 		log.Error("Failed to register node, retrying in 5s; Response was: ", string(retBody))
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.handleFailure()
 	}
 
 	if err != nil {
@@ -115,7 +130,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	if !found {
 		log.Error("Failed to register node, retrying in 5s")
 		time.Sleep(time.Second * 5)
-		return h.Register()
+		return h.handleFailure()
 	}
 
 	log.WithFields(logrus.Fields{

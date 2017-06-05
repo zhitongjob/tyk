@@ -111,7 +111,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop() {
 				hc.pollerStarted = true
 				hc.StartPoller()
 			}
-			log.Info("I am leader")
+			log.Debug("I am leader")
 			hc.Leader = true
 		} else {
 			log.WithFields(logrus.Fields{
@@ -149,17 +149,17 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	if activeInstance == hc.Id {
 		log.WithFields(logrus.Fields{
 			"prefix": "host-check-mgr",
-		}).Info("Primary instance set, I am master")
+		}).Debug("Primary instance set, I am master")
 		hc.store.SetKey(PollerCacheKey, hc.Id, 15) // Reset TTL
 		return true
 	}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Info("Active Instance is: ", activeInstance)
+	}).Debug("Active Instance is: ", activeInstance)
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Info("--- I am: ", hc.Id)
+	}).Debug("--- I am: ", hc.Id)
 
 	return false
 }

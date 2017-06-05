@@ -220,8 +220,12 @@ var APILoader = APIDefinitionLoader{}
 func getAPISpecs() []*APISpec {
 	var apiSpecs []*APISpec
 
-	if config.UseDBAppConfigs {
-
+	if config.EnableEmbeddedKV {
+		apiSpecs = APILoader.LoadDefinitionsFromKV()
+		log.WithFields(logrus.Fields{
+			"prefix": "main",
+		}).Debug("Retrieving API Configurations from K/V")
+	} else if config.UseDBAppConfigs {
 		connStr := buildConnStr("/system/apis")
 		apiSpecs = APILoader.LoadDefinitionsFromDashboardService(connStr, config.NodeSecret)
 
@@ -262,6 +266,15 @@ func getPolicies() {
 	log.WithFields(logrus.Fields{
 		"prefix": "main",
 	}).Info("Loading policies")
+
+	if config.EnableEmbeddedKV {
+		pols = LoadPoliciesFromKVStore(config.Policies.AllowExplicitPolicyID)
+		if len(pols) > 0 {
+			Policies = pols
+		}
+
+		return
+	}
 
 	switch config.Policies.PolicySource {
 	case "service":

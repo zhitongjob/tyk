@@ -72,7 +72,7 @@ func (d *DistributedKVStore) Connect() bool {
 		return true
 	}
 
-	log.Info("K/V Store already initialised, skipping")
+	log.Debug("K/V Store already initialised, skipping")
 	return true
 }
 
@@ -82,13 +82,7 @@ func (d *DistributedKVStore) getKey(k string) (string, error) {
 		return "", err
 	}
 
-	// The value element is a string, we need to unpack it first
-	var asStr string
-	if e := json.Unmarshal([]byte(v.Node.Value), &asStr); e != nil {
-		return "", err
-	}
-
-	return asStr, nil
+	return v.Node.Value, nil
 }
 
 func (d *DistributedKVStore) GetKey(k string) (string, error) {
@@ -247,7 +241,7 @@ func (d *DistributedKVStore) hashKey(in string) string {
 func (d *DistributedKVStore) fixKey(keyName string) string {
 	setKeyName := d.KeyPrefix + d.hashKey(keyName)
 
-	log.Info("Input key was: ", setKeyName)
+	log.Debug("Input key was: ", setKeyName)
 
 	return setKeyName
 }
