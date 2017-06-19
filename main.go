@@ -846,6 +846,11 @@ func initialiseSystem(arguments map[string]interface{}) {
 	}
 
 	loadConfig(filename, &config)
+	joinCluster, _ := arguments["--join"].(string)
+
+	if joinCluster != "" {
+		config.JoinCluster = joinCluster
+	}
 
 	if config.Storage.Type != "redis" {
 		log.WithFields(logrus.Fields{
@@ -934,6 +939,7 @@ func getCmdArguments() map[string]interface{} {
 		--for-api=<path>             Adds blueprint to existing API Defintition as version
 		--as-version=<version>       The version number to use when inserting
 		--log-instrumentation        Output instrumentation data to stdout
+		--join=HOST                  Join cluster
 	`
 
 	arguments, err := docopt.Parse(usage, nil, true, VERSION, false)

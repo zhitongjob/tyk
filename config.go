@@ -233,6 +233,7 @@ type Config struct {
 	ReloadWaitTime                    int                                   `bson:"reload_wait_time" json:"reload_wait_time"`
 	EnableEmbeddedKV                  bool                                  `bson:"enable_embedded_storage" json:"enable_embedded_storage"`
 	EmbeddedKV                        rafty.Config                          `bson:"embedded_storage" json:"embedded_storage"`
+	JoinCluster 			  string `bson:"join_cluster" json:"join_cluster"`
 	UseDistributedQuotaCounter        bool                                  `bson:"use_distributed_counter" json:"use_distributed_counter"`
 	DistributedQuotaFlushIntervalInMS int                                   `bson:"distributed_quota_flush_interval_in_ms" json:"distributed_quota_flush_interval_in_ms"`
 	DQSetMaster                       bool                                  `bson:"distributed_quota_set_master" json:"distributed_quota_set_master"`
@@ -321,7 +322,7 @@ func loadConfig(filePath string, conf *Config) {
 	//config.EnableEmbeddedKV = true
 	//config.EmbeddedKV.RunInSingleServerMode = false
 	//config.EmbeddedKV.TLSConfig = nil
-	//config.EmbeddedKV.HttpServerAddr = "127.0.0.1:11100"
+	//config.EmbeddedKV.HA = "127.0.0.1:11100"
 	//config.EmbeddedKV.RaftServerAddress = "127.0.0.1:11200"
 	//config.EmbeddedKV.ResetPeersOnLoad = true
 }

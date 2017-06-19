@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk-cluster-framework/distributed_store"
 	"github.com/TykTechnologies/tyk-cluster-framework/distributed_store/rafty"
 	"github.com/TykTechnologies/tyk-cluster-framework/encoding"
+	"time"
 )
 
 var embeddedKVStore *tcf.DistributedStore
@@ -17,48 +18,51 @@ type DistributedKVStore struct {
 	HashKeys  bool
 }
 
-func InitDistributedStore(config *rafty.Config) error {
+func InitDistributedStore(rconfig *rafty.Config) error {
 	var err error
 	var beacon client.Client
 
-	if !config.RunInSingleServerMode {
+	if !rconfig.RunInSingleServerMode {
 		if beacon, err = client.NewClient("beacon://0.0.0.0:11500/?interval=2", encoding.JSON); err != nil {
 			log.Fatal("Could not create a beacon: ", err)
 			return err
 		}
 	}
 
-	if config.JoinTimeout == 0 {
-		config.JoinTimeout = 5
+	if rconfig.JoinTimeout == 0 {
+		rconfig.JoinTimeout = 5
 	}
 
-	if config.RaftDir == "" {
-		config.RaftDir = "./raft"
+	if rconfig.RaftDir == "" {
+		rconfig.RaftDir = "./raft"
 	}
 
-	if config.HttpServerAddr == "" {
-		config.HttpServerAddr = "127.0.0.1:11100"
+	if rconfig.HttpServerAddr == "" {
+		rconfig.HttpServerAddr = "127.0.0.1:11100"
 	}
 
-	if config.RaftServerAddress == "" {
-		config.RaftServerAddress = "127.0.0.1:11200"
+	if rconfig.RaftServerAddress == "" {
+		rconfig.RaftServerAddress = "127.0.0.1:11200"
 	}
 
-	if !config.ResetPeersOnLoad {
-		config.ResetPeersOnLoad = true
+	if !rconfig.ResetPeersOnLoad {
+		rconfig.ResetPeersOnLoad = true
 	}
 
 	// TODO: remove this
 	log.Warning("====== K/V TLS IS FORCIBLY DISBLED ======")
-	config.TLSConfig = nil
+	rconfig.TLSConfig = nil
 
-	embeddedKVStore, err = tcf.NewDistributedStore(config)
+	embeddedKVStore, err = tcf.NewDistributedStore(rconfig)
 	if err != nil {
 		log.Fatal("Failed to create a new distributed store: ", err)
 		return err
 	}
 
-	embeddedKVStore.Start("", beacon)
+	// TODO: move Join address into rafty
+	embeddedKVStore.Start(config.JoinCluster, beacon)
+
+	time.Sleep(5 * time.Second)
 	return nil
 }
 

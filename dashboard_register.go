@@ -151,7 +151,7 @@ func (h *HTTPDashboardHandler) StartBeating() error {
 		if failure != nil {
 			log.Warning(failure)
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 5)
 	}
 
 	log.Info("Stopped Heartbeat")
