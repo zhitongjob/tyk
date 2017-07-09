@@ -15,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/dq"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/satori/go.uuid"
 )
 
 var DQFlusherPool *tunny.WorkPool = tunny.CreatePoolGeneric(10)
@@ -149,7 +150,7 @@ func startDQ(statusFunc GetLeaderStatusFunc) {
 		}
 	}
 
-	QuotaHandler = dq.NewDQ(dqFlusher, dqErrorHandler, NodeID)
+	QuotaHandler = dq.NewDQ(dqFlusher, dqErrorHandler, uuid.NewV4().String())
 	broadcastTimer := time.Millisecond * 500
 	QuotaHandler.BroadcastWith(c1, broadcastTimer, getDQTopic())
 
