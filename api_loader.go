@@ -272,14 +272,22 @@ func processSpec(spec *APISpec,
 		handleCORS(&chainArray, spec)
 
 		for _, obj := range mwPreFuncs {
-			if mwDriver != apidef.OttoDriver {
+			if mwDriver != apidef.OttoDriver && mwDriver != apidef.GoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				if mwDriver == apidef.OttoDriver {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				} else {
+					log.WithFields(logrus.Fields{
+						"prefix":   "coprocess",
+						"api_name": spec.Name,
+					}).Info("Adding Go PRE Plugin")
+					appendMiddleware(&chainArray, &MWGoPlugin{BaseMiddleware: baseMid})
+				}
 			}
 		}
 
@@ -320,14 +328,22 @@ func processSpec(spec *APISpec,
 
 		// Add pre-process MW
 		for _, obj := range mwPreFuncs {
-			if mwDriver != apidef.OttoDriver {
+			if mwDriver != apidef.OttoDriver && mwDriver != apidef.GoDriver {
 				log.WithFields(logrus.Fields{
 					"prefix":   "coprocess",
 					"api_name": spec.Name,
 				}).Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
 				appendMiddleware(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver})
 			} else {
-				chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				if mwDriver == apidef.OttoDriver {
+					chainArray = append(chainArray, CreateDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+				} else {
+					log.WithFields(logrus.Fields{
+						"prefix":   "coprocess",
+						"api_name": spec.Name,
+					}).Info("Adding Go PRE Plugin")
+					appendMiddleware(&chainArray, &MWGoPlugin{BaseMiddleware: baseMid})
+				}
 			}
 		}
 
