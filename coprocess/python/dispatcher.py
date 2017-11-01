@@ -12,7 +12,7 @@ from gateway import TykGateway as tyk
 class TykDispatcher:
     '''A simple dispatcher'''
 
-    def __init__(self, middleware_path, event_handler_path, bundle_paths):
+    def __init__(self, middleware_path, event_handler_path, bundle_path):
         tyk.log( "Initializing dispatcher", "info" )
 
         self.event_handler_path = path.join(event_handler_path, '*.py')
@@ -20,8 +20,7 @@ class TykDispatcher:
         self.load_event_handlers()
 
         self.middleware_path = path.join(middleware_path, '*.py')
-
-        self.bundle_paths = bundle_paths.split(":")
+        self.bundle_path = bundle_path
 
         self.middlewares = []
         self.hook_table = {}
@@ -42,46 +41,53 @@ class TykDispatcher:
         return found_middleware
 
     def load_bundle(self, base_bundle_path):
-        bundle_path = path.join(base_bundle_path, '*.py')
-        bundle_modules = self.get_modules(bundle_path)
-        sys.path.append(base_bundle_path)
-        for module_name in bundle_modules:
-            middleware = self.find_middleware(module_name)
-            if middleware:
-                middleware.reload()
-            else:
-                middleware = TykMiddleware(module_name)
-                self.middlewares.append(middleware)
+        # bundle_path = path.join(base_bundle_path, 'middleware.py')
+        base_module_name = base_bundle_path.replace(self.bundle_path, "").replace("/", "").strip()
+        module_name = base_module_name + ".middleware"
+        middleware = self.find_middleware(module_name)
+        if middleware:
+            middleware.reload()
+        else:
+            middleware = TykMiddleware(module_name)
+            self.middlewares.append(middleware)
         self.update_hook_table()
 
 
     def load_middlewares(self):
+        print("load_middlewares is called")
         tyk.log( "Loading middlewares.", "debug" )
-        available_modules = self.get_modules(self.middleware_path)
-        for module_name in available_modules:
-            middleware = self.find_middleware(module_name)
-            if middleware:
-                middleware.reload()
-            else:
-                middleware = TykMiddleware(module_name)
-                self.middlewares.append(middleware)
-        self.update_hook_table()
+        # self.update_hook_table()
+        # print("Hook table looks like:")
+        # print(self.hook_table)
 
     def purge_middlewares(self):
-        tyk.log( "Purging middlewares.", "debug" )
-        available_modules = self.get_modules(self.middleware_path)
-        for middleware in self.middlewares:
-            if not middleware.filepath in available_modules:
-                tyk.log( "Purging middleware: '{0}'".format(middleware.filepath), "warning" )
-                self.middlewares.remove(middleware)
+        print("purge_middlewares, removing all items from self.middleware")
+        self.middlewares = []
+        # tyk.log( "Purging middlewares.", "debug" )
+        # available_modules = self.get_modules(self.middleware_path)
+        # for middleware in self.middlewares:
+        #    if not middleware.filepath in available_modules:
+        #        tyk.log( "Purging middleware: '{0}'".format(middleware.filepath), "warning" )
+        #        self.middlewares.remove(middleware)
 
     def update_hook_table(self):
+        print("update_hook_table is called")
         new_hook_table = {}
+        # for middleware in self.middlewares:
+        #    print("middleware iter: ", middleware)
+        #    for hook_type in middleware.handlers:
+        #        for handler in middleware.handlers[hook_type]:
+        #            handler.middleware = middleware
+        #            new_hook_table[handler.name] = handler
         for middleware in self.middlewares:
+            api_id = middleware.api_id
+            hooks = {}
             for hook_type in middleware.handlers:
                 for handler in middleware.handlers[hook_type]:
                     handler.middleware = middleware
-                    new_hook_table[handler.name] = handler
+                    hooks[handler.name] = handler
+            new_hook_table[api_id] = hooks
+        print("new hook table is set", new_hook_table)
         self.hook_table = new_hook_table
 
     def find_hook_by_type_and_name(self, hook_type, hook_name):
@@ -143,8 +149,10 @@ class TykDispatcher:
     def reload(self):
         tyk.log( "Reloading event handlers and middlewares.", "info" )
 
-        self.purge_event_handlers()
-        self.load_event_handlers()
+        # self.purge_event_handlers()
+        # self.load_event_handlers()
 
-        self.purge_middlewares()
-        self.load_middlewares()
+        # self.purge_middlewares()
+        # self.load_middlewares()
+        print("middlwares after reload: ", self.middlewares)
+        print("hook table after reload: ", self.hook_table)
