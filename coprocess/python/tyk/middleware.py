@@ -14,6 +14,9 @@ class TykMiddleware:
         tyk.log( "Loading module: '{0}'".format(filepath), "info")
         self.filepath = filepath
         self.handlers = {}
+        
+        module_splits = filepath.split('_')
+        self.api_id, self.middleware_id = module_splits[0], module_splits[1]
 
         try:
             self.module = import_module(filepath)
