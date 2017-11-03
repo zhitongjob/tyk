@@ -22,7 +22,7 @@ class TykDispatcher:
         self.middleware_path = path.join(middleware_path, '*.py')
         self.bundle_path = bundle_path
 
-        self.middlewares = []
+        self.bundles = []
         self.hook_table = {}
         self.load_middlewares()
 
@@ -31,64 +31,61 @@ class TykDispatcher:
         files = [ path.basename( f.replace('.py', '') ) for f in files ]
         return files
 
-    def find_middleware(self, path):
-        found_middleware = None
-        if len(self.middlewares) > 0:
-            for middleware in self.middlewares:
-                if middleware.filepath == path and not found_middleware:
-                    found_middleware = middleware
-                    break
-        return found_middleware
+    def find_bundle(self, bundle_id):
+        found = None
+        for bundle in self.bundles:
+            if bundle.bundle_id == bundle_id:
+                found = bundle
+                break
+        return found
 
-    def load_bundle(self, base_bundle_path):
-        # bundle_path = path.join(base_bundle_path, 'middleware.py')
-        base_module_name = base_bundle_path.replace(self.bundle_path, "").replace("/", "").strip()
-        module_name = base_module_name + ".middleware"
-        middleware = self.find_middleware(module_name)
-        if middleware:
-            middleware.reload()
-        else:
-            middleware = TykMiddleware(module_name)
-            self.middlewares.append(middleware)
-        self.update_hook_table()
+    def load_bundle(self, bundle_path):
+        path_splits = bundle_path.split('/')
+        bundle_id = path_splits[-1]
+        bundle = self.find_bundle(bundle_id)
+        if not bundle:
+            bundle = TykMiddleware(bundle_id)
+            self.bundles.append(bundle)
+            self.update_hook_table(with_bundle=bundle)
+
+            return
+        self.update_hook_table(with_bundle=bundle)
 
 
     def load_middlewares(self):
-        print("load_middlewares is called")
         tyk.log( "Loading middlewares.", "debug" )
-        # self.update_hook_table()
-        # print("Hook table looks like:")
-        # print(self.hook_table)
 
     def purge_middlewares(self):
-        print("purge_middlewares, removing all items from self.middleware")
         self.middlewares = []
-        # tyk.log( "Purging middlewares.", "debug" )
-        # available_modules = self.get_modules(self.middleware_path)
-        # for middleware in self.middlewares:
-        #    if not middleware.filepath in available_modules:
-        #        tyk.log( "Purging middleware: '{0}'".format(middleware.filepath), "warning" )
-        #        self.middlewares.remove(middleware)
 
-    def update_hook_table(self):
-        print("update_hook_table is called")
+    def init_hook_table(self):
         new_hook_table = {}
-        # for middleware in self.middlewares:
-        #    print("middleware iter: ", middleware)
-        #    for hook_type in middleware.handlers:
-        #        for handler in middleware.handlers[hook_type]:
-        #            handler.middleware = middleware
-        #            new_hook_table[handler.name] = handler
-        for middleware in self.middlewares:
-            api_id = middleware.api_id
+        for bundle in self.bundles:
+            api_id = bundle.api_id
             hooks = {}
-            for hook_type in middleware.handlers:
-                for handler in middleware.handlers[hook_type]:
-                    handler.middleware = middleware
+            for hook_type in bundle.handlers:
+                for handler in bundle.handlers[hook_type]:
+                    handler.middleware = bundle
                     hooks[handler.name] = handler
             new_hook_table[api_id] = hooks
-        print("new hook table is set", new_hook_table)
         self.hook_table = new_hook_table
+
+    def update_hook_table(self, with_bundle=None):
+        new_hook_table = {}
+        # Disable any previous bundle associated with an API:
+        if with_bundle:
+            # First check if this API exists in the hook table:
+            the_hooks = []
+            if with_bundle.api_id in self.hook_table:
+                the_hooks = self.hook_table[with_bundle.api_id]
+            if len(the_hooks) > 0:
+                # Pick the first hook and get the current bundle:
+                bundle_in_use = list(the_hooks.values())[0].middleware
+                # If the bundle is already in use, skip the hook table update:
+                if bundle_in_use.bundle_id == with_bundle.bundle_id:
+                    return
+            the_hooks = with_bundle.build_hooks()
+            self.hook_table[with_bundle.api_id] = the_hooks
 
     def find_hook_by_type_and_name(self, hook_type, hook_name):
         found_middleware, matching_hook_handler = None, None
@@ -107,10 +104,18 @@ class TykDispatcher:
             middleware = hook_handler.middleware
         return middleware, hook_handler
 
+    def find_hook(self, api_id, hook_name):
+        hooks = self.hook_table[api_id]
+        if hook_name not in hooks:
+            return None
+        hook = hooks[hook_name]
+        return hook.middleware, hook
+
     def dispatch_hook(self, object_msg):
         try:
             object = TykCoProcessObject(object_msg)
-            middleware, hook_handler = self.find_hook_by_name(object.hook_name)
+            api_id = object.spec['APIID']
+            middleware, hook_handler = self.find_hook(api_id, object.hook_name)
             if hook_handler:
                 object = middleware.process(hook_handler, object)
             else:
@@ -154,5 +159,3 @@ class TykDispatcher:
 
         # self.purge_middlewares()
         # self.load_middlewares()
-        print("middlwares after reload: ", self.middlewares)
-        print("hook table after reload: ", self.hook_table)
