@@ -2,9 +2,15 @@ from importlib import import_module
 from importlib import reload as reload_module
 from importlib import invalidate_caches as invalidate_caches
 
-import inspect, sys
-import tyk.decorators as decorators
+from types import ModuleType
 
+import importlib.util
+
+import inspect, sys, os
+from time import sleep
+
+import tyk.decorators as decorators
+from tyk.loader import MiddlewareLoader
 from gateway import TykGateway as tyk
 
 HandlerDecorators = list( map( lambda m: m[1], inspect.getmembers(decorators, inspect.isclass) ) )
@@ -14,13 +20,26 @@ class TykMiddleware:
         tyk.log( "Loading module: '{0}'".format(filepath), "info")
         self.filepath = filepath
         self.handlers = {}
+
+        self.bundle_id = filepath
+
+        self.imported_modules = []
         
         module_splits = filepath.split('_')
         self.api_id, self.middleware_id = module_splits[0], module_splits[1]
 
+        self.module_path = "middleware/bundles/" + filepath
+        self.mw_path = self.module_path + "/middleware.py"
+
         try:
-            self.module = import_module(filepath)
+            self.loader = MiddlewareLoader(self)
+            sys.meta_path.append(self.loader)
+            invalidate_caches()
+            spec = importlib.util.spec_from_file_location(filepath, location=self.mw_path, submodule_search_locations=[self.module_path])
+            self.module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(self.module)
             self.register_handlers()
+            self.cleanup()
         except:
             tyk.log_error( "Middleware initialization error:" )
 
@@ -37,13 +56,18 @@ class TykMiddleware:
                     new_handlers[handler_type].append(attr_value)
         self.handlers = new_handlers
 
-    def reload(self):
-        try:
-            invalidate_caches()
-            reload_module(self.module)
-            self.register_handlers()
-        except:
-            tyk.log_error( "Reload error:" )
+    def build_hooks(self):
+        hooks = {}
+        for hook_type in self.handlers:
+            for handler in self.handlers[hook_type]:
+                handler.middleware = self
+                hooks[handler.name] = handler
+        return hooks
+
+    def cleanup(self):
+        sys.meta_path.pop()
+        for m in self.imported_modules:
+            del sys.modules[m]
 
     def process(self, handler, object):
         handlerType = type(handler)
