@@ -46,9 +46,6 @@ class TykDispatcher:
         if not bundle:
             bundle = TykMiddleware(bundle_id)
             self.bundles.append(bundle)
-            self.update_hook_table(with_bundle=bundle)
-
-            return
         self.update_hook_table(with_bundle=bundle)
 
 
@@ -75,17 +72,16 @@ class TykDispatcher:
         # Disable any previous bundle associated with an API:
         if with_bundle:
             # First check if this API exists in the hook table:
-            the_hooks = []
+            hooks = {}
             if with_bundle.api_id in self.hook_table:
-                the_hooks = self.hook_table[with_bundle.api_id]
-            if len(the_hooks) > 0:
+                hooks = self.hook_table[with_bundle.api_id]
+            if len(hooks) > 0:
                 # Pick the first hook and get the current bundle:
-                bundle_in_use = list(the_hooks.values())[0].middleware
+                bundle_in_use = list(hooks.values())[0].middleware
                 # If the bundle is already in use, skip the hook table update:
                 if bundle_in_use.bundle_id == with_bundle.bundle_id:
                     return
-            the_hooks = with_bundle.build_hooks()
-            self.hook_table[with_bundle.api_id] = the_hooks
+            self.hook_table[with_bundle.api_id] = with_bundle.build_hooks()
 
     def find_hook_by_type_and_name(self, hook_type, hook_name):
         found_middleware, matching_hook_handler = None, None
@@ -106,10 +102,12 @@ class TykDispatcher:
 
     def find_hook(self, api_id, hook_name):
         hooks = self.hook_table[api_id]
-        if hook_name not in hooks:
-            return None
-        hook = hooks[hook_name]
-        return hook.middleware, hook
+        # TODO: handle this situation and also nonexistent hooks
+        if not hooks:
+            pass
+        hook = hooks.get(hook_name)
+        if hook:
+            return hook.middleware, hook
 
     def dispatch_hook(self, object_msg):
         try:
