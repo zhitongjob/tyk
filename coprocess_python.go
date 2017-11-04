@@ -170,6 +170,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/Sirupsen/logrus"
@@ -188,6 +189,7 @@ var MessageType = coprocess.ProtobufMessage
 // PythonDispatcher implements a coprocess.Dispatcher
 type PythonDispatcher struct {
 	coprocess.Dispatcher
+	mu sync.Mutex
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
@@ -211,12 +213,14 @@ func (d *PythonDispatcher) Reload() {
 
 // HandleMiddlewareCache isn't used by Python.
 func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
+	d.mu.Lock()
 	go func() {
 		runtime.LockOSThread()
 		CBundlePath := C.CString(basePath)
 		defer func() {
 			runtime.UnlockOSThread()
 			C.free(unsafe.Pointer(CBundlePath))
+			d.mu.Unlock()
 		}()
 		C.Python_HandleMiddlewareCache(CBundlePath)
 	}()
@@ -254,7 +258,7 @@ func PythonNewDispatcher(middlewarePath, eventHandlerPath string, bundlePath str
 		return nil, errors.New("can't initialize a dispatcher")
 	}
 
-	dispatcher := &PythonDispatcher{}
+	dispatcher := &PythonDispatcher{mu: sync.Mutex{}}
 
 	return dispatcher, nil
 }
