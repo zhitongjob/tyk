@@ -16,19 +16,20 @@ from gateway import TykGateway as tyk
 HandlerDecorators = list( map( lambda m: m[1], inspect.getmembers(decorators, inspect.isclass) ) )
 
 class TykMiddleware:
-    def __init__(self, filepath):
+    def __init__(self, filepath, bundle_root_path=None):
         tyk.log( "Loading module: '{0}'".format(filepath), "info")
         self.filepath = filepath
         self.handlers = {}
 
         self.bundle_id = filepath
+        self.bundle_root_path = bundle_root_path
 
         self.imported_modules = []
         
         module_splits = filepath.split('_')
         self.api_id, self.middleware_id = module_splits[0], module_splits[1]
 
-        self.module_path = "middleware/bundles/" + filepath
+        self.module_path = os.path.join(self.bundle_root_path, filepath)
         self.mw_path = self.module_path + "/middleware.py"
 
         try:

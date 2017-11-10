@@ -12,7 +12,7 @@ from gateway import TykGateway as tyk
 class TykDispatcher:
     '''A simple dispatcher'''
 
-    def __init__(self, middleware_path, event_handler_path, bundle_path):
+    def __init__(self, middleware_path, event_handler_path, bundle_root_path):
         tyk.log( "Initializing dispatcher", "info" )
 
         self.event_handler_path = path.join(event_handler_path, '*.py')
@@ -20,7 +20,7 @@ class TykDispatcher:
         self.load_event_handlers()
 
         self.middleware_path = path.join(middleware_path, '*.py')
-        self.bundle_path = bundle_path
+        self.bundle_root_path = bundle_root_path
 
         self.bundles = []
         self.hook_table = {}
@@ -44,7 +44,7 @@ class TykDispatcher:
         bundle_id = path_splits[-1]
         bundle = self.find_bundle(bundle_id)
         if not bundle:
-            bundle = TykMiddleware(bundle_id)
+            bundle = TykMiddleware(bundle_id, bundle_root_path=self.bundle_root_path)
             self.bundles.append(bundle)
         self.update_hook_table(with_bundle=bundle)
 
