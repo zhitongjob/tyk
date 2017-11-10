@@ -57,7 +57,7 @@ class TykMiddleware:
                     new_handlers[handler_type].append(attr_value)
         self.handlers = new_handlers
 
-    def build_hooks(self):
+    def build_hooks_and_event_handlers(self):
         hooks = {}
         for hook_type in self.handlers:
             for handler in self.handlers[hook_type]:
@@ -73,7 +73,10 @@ class TykMiddleware:
     def process(self, handler, object):
         handlerType = type(handler)
 
-        if handler.arg_count == 4:
+        if handlerType == decorators.Event:
+            handler(object, object.spec)
+            return
+        elif handler.arg_count == 4:
             object.request, object.session, object.metadata = handler(object.request, object.session, object.metadata, object.spec)
         elif handler.arg_count == 3:
             object.request, object.session = handler(object.request, object.session, object.spec)
