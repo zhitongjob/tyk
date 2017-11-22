@@ -4,9 +4,7 @@ from importlib import invalidate_caches as invalidate_caches
 
 from types import ModuleType
 
-import importlib.util
-
-import inspect, sys, os
+import importlib.util, inspect, sys, os, json
 from time import sleep
 
 import tyk.decorators as decorators
@@ -30,7 +28,13 @@ class TykMiddleware:
         self.api_id, self.middleware_id = module_splits[0], module_splits[1]
 
         self.module_path = os.path.join(self.bundle_root_path, filepath)
-        self.mw_path = self.module_path + "/middleware.py"
+        self.parse_manifest()
+
+        self.mw_path = os.path.join(self.module_path, "/middleware.py")
+
+        # Fallback for single file bundles:
+        if len(self.manifest['file_list']) == 1:
+            self.mw_path = os.path.join(self.module_path, self.manifest['file_list'][0])
 
         try:
             self.loader = MiddlewareLoader(self)
@@ -81,3 +85,9 @@ class TykMiddleware:
         elif handler.arg_count == 3:
             object.request, object.session = handler(object.request, object.session, object.spec)
         return object
+
+    def parse_manifest(self):
+        manifest_path = os.path.join(self.module_path, "manifest.json")
+        with open(manifest_path, 'r') as f:
+            print(1)
+            self.manifest = json.load(f)
