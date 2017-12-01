@@ -1461,6 +1461,7 @@ func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
 	setCtxValue(r, VersionData, v)
 }
 
+<<<<<<< HEAD
 func ctxSetUrlRewritePath(r *http.Request, path string) {
 	setCtxValue(r, UrlRewritePath, path)
 }
@@ -1472,4 +1473,15 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 		}
 	}
 	return ""
+=======
+func ctxGetDefaultVersion(r *http.Request) bool {
+	if r.Context().Value(VersionDefault) != nil {
+		return true
+	}
+	return false
+}
+
+func ctxSetDefaultVersion(r *http.Request) {
+	setCtxValue(r, VersionDefault, true)
+>>>>>>> allow specifying default version in config
 }

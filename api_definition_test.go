@@ -102,6 +102,42 @@ const nonExpiringMultiDef = `{
 	}
 }`
 
+const nonExpiringMultiDefWithDefault = `{
+	"api_id": "1",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"not_versioned": false,
+		"default_version": "v2",
+		"versions": {
+			"v1": {
+				"name": "v1",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+					"white_list": ["/v1/allowed/whitelist/literal", "/v1/allowed/whitelist/{id}"],
+					"black_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"]
+				}
+			},
+			"v2": {
+				"name": "v2",
+				"expires": "3000-01-02 15:04",
+				"paths": {
+					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
+					"black_list": ["/v1/disallowed/blacklist/literal"]
+				}
+			}
+		}
+	},
+	"proxy": {
+		"listen_path": "/v1",
+		"target_url": "` + testHttpAny + `"
+	}
+}`
+
 func createDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
@@ -142,6 +178,22 @@ func TestNotVersioned(t *testing.T) {
 	if status != StatusOk {
 		t.Error("Request should return StatusOk status!")
 		t.Error(status)
+	}
+}
+
+func TestDefaultVersion(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	req := testReq(t, "GET", "/bananaphone", nil)
+
+	spec := createDefinitionFromString(nonExpiringMultiDefWithDefault)
+	print(recorder.Header().Get("X-Tyk-Default-Version"))
+	ok, _, _ := spec.RequestValid(req)
+	if !ok {
+		t.Error("Request should succeed as default version has been specified in config!")
+	}
+	if def := recorder.Header().Get("X-Tyk-Default-Version"); def != "v2" {
+		t.Error("Default Version header was not applied from config!")
 	}
 }
 

@@ -87,6 +87,13 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		t := time.Now()
 
+		if ctxGetDefaultVersion(r) {
+			fmt.Println("XTYKHEADERDEFAULT =")
+
+			vinfo := ctxGetVersionInfo(r)
+			w.Header().Set("X-Tyk-Default-Version", vinfo.Name)
+		}
+
 		version := e.Spec.getVersionFromRequest(r)
 		if version == "" {
 			version = "Non Versioned"
