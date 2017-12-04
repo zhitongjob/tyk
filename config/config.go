@@ -262,6 +262,7 @@ type Config struct {
 	LogLevel                          string                                `json:"log_level"`
 	Security                          SecurityConfig                        `json:"security"`
 	EnableKeyLogging                  bool                                  `json:"enable_key_logging"`
+	DefaultVersionHeader              bool                                  `json:"default_version_header"`
 }
 
 type CertData struct {

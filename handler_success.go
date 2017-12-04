@@ -221,8 +221,11 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 	}
 
 	if ctxGetDefaultVersion(r) {
-		vinfo := ctxGetVersionInfo(r)
-		w.Header().Set("X-Tyk-Default-Version", vinfo.Name)
+		if vinfo := ctxGetVersionInfo(r); vinfo != nil {
+			if config.Global.DefaultVersionHeader {
+				w.Header().Set(defaultVersionHeader, vinfo.Name)
+			}
+		}
 	}
 
 	var copiedRequest *http.Request
@@ -262,14 +265,18 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 		copiedRequest = copyRequest(r)
 	}
 
+	if ctxGetDefaultVersion(r) {
+		if vinfo := ctxGetVersionInfo(r); vinfo != nil {
+			if config.Global.DefaultVersionHeader {
+				w.Header().Set(defaultVersionHeader, vinfo.Name)
+			}
+		}
+	}
+
 	t1 := time.Now()
 	inRes := s.Proxy.ServeHTTPForCache(w, r)
 	t2 := time.Now()
 
-	if ctxGetDefaultVersion(r) {
-		vinfo := ctxGetVersionInfo(r)
-		w.Header().Set("X-Tyk-Default-Version", vinfo.Name)
-	}
 	var copiedResponse *http.Response
 	if recordDetail(r) {
 		copiedResponse = copyResponse(inRes)

@@ -13,6 +13,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/lonelycode/gorpc"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
@@ -102,42 +103,6 @@ const nonExpiringMultiDef = `{
 	}
 }`
 
-const nonExpiringMultiDefWithDefault = `{
-	"api_id": "1",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"not_versioned": false,
-		"default_version": "v2",
-		"versions": {
-			"v1": {
-				"name": "v1",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"white_list": ["/v1/allowed/whitelist/literal", "/v1/allowed/whitelist/{id}"],
-					"black_list": ["/v1/disallowed/blacklist/literal", "/v1/disallowed/blacklist/{id}"]
-				}
-			},
-			"v2": {
-				"name": "v2",
-				"expires": "3000-01-02 15:04",
-				"paths": {
-					"ignored": ["/v1/ignored/noregex", "/v1/ignored/with_id/{id}"],
-					"black_list": ["/v1/disallowed/blacklist/literal"]
-				}
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/v1",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
 func createDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
@@ -182,18 +147,53 @@ func TestNotVersioned(t *testing.T) {
 }
 
 func TestDefaultVersion(t *testing.T) {
-	recorder := httptest.NewRecorder()
+	config.Global.ListenAddress = "127.0.0.1"
 
-	req := testReq(t, "GET", "/bananaphone", nil)
+	ln, _ := generateListener(0)
+	baseURL := "http://" + ln.Addr().String()
+	listen(ln, nil, nil)
+	defer func() {
+		config.Global.ListenAddress = ""
+		ln.Close()
+	}()
 
-	spec := createDefinitionFromString(nonExpiringMultiDefWithDefault)
-	print(recorder.Header().Get("X-Tyk-Default-Version"))
-	ok, _, _ := spec.RequestValid(req)
-	if !ok {
-		t.Error("Request should succeed as default version has been specified in config!")
+	buildAndLoadAPI(func(spec *APISpec) {
+		v1 := apidef.VersionInfo{Name: "v1"}
+		v1.Name = "v1"
+		v1.Paths.WhiteList = []string{"/foo"}
+
+		v2 := apidef.VersionInfo{Name: "v2"}
+		v2.Paths.WhiteList = []string{"/bar"}
+
+		spec.VersionDefinition.Location = "url-param"
+		spec.VersionDefinition.Key = "v"
+		spec.VersionData.NotVersioned = false
+
+		spec.VersionData.Versions["v1"] = v1
+		spec.VersionData.Versions["v2"] = v2
+		spec.VersionData.DefaultVersion = "v2"
+		spec.Proxy.ListenPath = "/"
+	})
+
+	testCases := [...]struct {
+		url  string
+		code int
+	}{
+		{"/foo", 403},      // Not whitelisted for default v2
+		{"/bar", 200},      // Whitelisted for default v2
+		{"/foo?v=v1", 200}, // Allowed for v1
+		{"/bar?v=v1", 403}, // Not allowed for v1
 	}
-	if def := recorder.Header().Get("X-Tyk-Default-Version"); def != "v2" {
-		t.Error("Default Version header was not applied from config!")
+
+	for _, tc := range testCases {
+		resp, err := http.Get(baseURL + tc.url)
+		if err != nil {
+			t.Fatal(err, tc)
+		}
+
+		if resp.StatusCode != tc.code {
+			t.Error(tc.url, resp.StatusCode, tc.code)
+		}
 	}
 }
 
