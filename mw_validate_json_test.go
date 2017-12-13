@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,17 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/justinas/alice"
 )
+
+type res struct {
+	Error string
+	Code  int
+}
+
+type fixture struct {
+	in   string
+	out  res
+	name string
+}
 
 var schema = `{
     "title": "Person",
@@ -30,46 +42,6 @@ var schema = `{
     },
     "required": ["firstName", "lastName"]
 }`
-
-const validateJSONPathGatewaySetup = `{
-	"api_id": "jsontest",
-	"definition": {
-		"location": "header",
-		"key": "version"
-	},
-	"auth": {"auth_header_name": "authorization"},
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"default": {
-				"name": "default",
-				"use_extended_paths": true,
-				"extended_paths": {
-					"validate_json": [{
-						"method": "POST",
-						"path": "me",
-						"validate_with_64": "ew0KICAgICJ0aXRsZSI6ICJQZXJzb24iLA0KICAgICJ0eXBlIjogIm9iamVjdCIsDQogICAgInByb3BlcnRpZXMiOiB7DQogICAgICAgICJmaXJzdE5hbWUiOiB7DQogICAgICAgICAgICAidHlwZSI6ICJzdHJpbmciDQogICAgICAgIH0sDQogICAgICAgICJsYXN0TmFtZSI6IHsNCiAgICAgICAgICAgICJ0eXBlIjogInN0cmluZyINCiAgICAgICAgfSwNCiAgICAgICAgImFnZSI6IHsNCiAgICAgICAgICAgICJkZXNjcmlwdGlvbiI6ICJBZ2UgaW4geWVhcnMiLA0KICAgICAgICAgICAgInR5cGUiOiAiaW50ZWdlciIsDQogICAgICAgICAgICAibWluaW11bSI6IDANCiAgICAgICAgfQ0KICAgIH0sDQogICAgInJlcXVpcmVkIjogWyJmaXJzdE5hbWUiLCAibGFzdE5hbWUiXQ0KfQ=="
-					}]
-				}
-			}
-		}
-	},
-	"proxy": {
-		"listen_path": "/validate/",
-		"target_url": "` + testHttpAny + `"
-	}
-}`
-
-type res struct {
-	Error string
-	Code  int
-}
-
-type fixture struct {
-	in   string
-	out  res
-	name string
-}
 
 var fixtures = []fixture{
 	{
@@ -104,6 +76,44 @@ var fixtures = []fixture{
 	},
 }
 
+func getJsonPathGatewaySetup() string {
+
+	validateJSONPathGatewaySetup := `{
+	"api_id": "jsontest",
+	"definition": {
+		"location": "header",
+		"key": "version"
+	},
+	"auth": {"auth_header_name": "authorization"},
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"default": {
+				"name": "default",
+				"use_extended_paths": true,
+				"extended_paths": {
+					"validate_json": [{
+						"method": "POST",
+						"path": "me",
+						"validate_with_64": "BASE_64_REPLACE_SCHEMA"
+					}]
+				}
+			}
+		}
+	},
+	"proxy": {
+		"listen_path": "/validate/",
+		"target_url": "` + testHttpAny + `"
+	}
+}`
+
+	sEnc := base64.StdEncoding.EncodeToString([]byte(schema))
+
+	validateJSONPathGatewaySetup = strings.Replace(validateJSONPathGatewaySetup, "BASE_64_REPLACE_SCHEMA", sEnc, 1)
+
+	return validateJSONPathGatewaySetup
+}
+
 func TestValidateJSON_validate(t *testing.T) {
 
 	for _, f := range fixtures {
@@ -111,15 +121,18 @@ func TestValidateJSON_validate(t *testing.T) {
 		t.Run(f.name, func(st *testing.T) {
 			vj := ValidateJSON{}
 
-			res, _ := vj.validate([]byte(f.in), []byte(schema))
+			res, err := vj.validate([]byte(f.in), []byte(schema))
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			st.Log("in:", f.in)
 			if !res.Valid() && f.out.Code != http.StatusUnprocessableEntity {
-				st.Error("Expected invalid")
+				st.Fatal("Expected invalid")
 			}
 
 			if res.Valid() && f.out.Code != http.StatusOK {
-				st.Error("expected valid")
+				t.Log(res.Errors())
+				st.Fatal("expected valid", res.Valid(), f.out.Code)
 			}
 		})
 	}
@@ -131,7 +144,7 @@ func TestValidateJSON_ProcessRequest(t *testing.T) {
 
 		t.Run(f.name, func(st *testing.T) {
 
-			spec := createSpecTest(st, validateJSONPathGatewaySetup)
+			spec := createSpecTest(st, getJsonPathGatewaySetup())
 			recorder := httptest.NewRecorder()
 			req := testReq(t, "POST", "/validate/me", f.in)
 
