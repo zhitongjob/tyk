@@ -703,14 +703,14 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 }
 
 func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus) []URLSpec {
-	urlSpec := []URLSpec{}
+	urlSpec := make([]URLSpec, len(paths))
 
-	for _, stringSpec := range paths {
+	for i, stringSpec := range paths {
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat)
 		// Extend with method actions
 		newSpec.ValidatePathMeta = stringSpec
-		urlSpec = append(urlSpec, newSpec)
+		urlSpec[i] = newSpec
 	}
 
 	return urlSpec
