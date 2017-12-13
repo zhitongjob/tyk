@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -95,7 +95,7 @@ func getJsonPathGatewaySetup() string {
 					"validate_json": [{
 						"method": "POST",
 						"path": "me",
-						"validate_with_64": "BASE_64_REPLACE_SCHEMA"
+						"validate_with": REPLACE_SCHEMA
 					}]
 				}
 			}
@@ -106,10 +106,7 @@ func getJsonPathGatewaySetup() string {
 		"target_url": "` + testHttpAny + `"
 	}
 }`
-
-	sEnc := base64.StdEncoding.EncodeToString([]byte(schema))
-
-	validateJSONPathGatewaySetup = strings.Replace(validateJSONPathGatewaySetup, "BASE_64_REPLACE_SCHEMA", sEnc, 1)
+	validateJSONPathGatewaySetup = strings.Replace(validateJSONPathGatewaySetup, "REPLACE_SCHEMA", schema, 1)
 
 	return validateJSONPathGatewaySetup
 }
@@ -121,7 +118,13 @@ func TestValidateJSON_validate(t *testing.T) {
 		t.Run(f.name, func(st *testing.T) {
 			vj := ValidateJSON{}
 
-			res, err := vj.validate([]byte(f.in), []byte(schema))
+			dat := map[string]interface{}{}
+
+			if err := json.Unmarshal([]byte(schema), &dat); err != nil {
+				t.Fatal(err)
+			}
+
+			res, err := vj.validate([]byte(f.in), dat)
 			if err != nil {
 				t.Fatal(err)
 			}

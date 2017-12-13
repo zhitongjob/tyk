@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -36,11 +35,12 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	_, versionPaths, _, _ := k.Spec.Version(r)
 	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, ValidateJSONRequest)
 	if !found {
-		return nil, 200
+		return nil, http.StatusOK
 	}
 
-	mmeta := meta.(*apidef.ValidatePathMeta)
-	if mmeta.ValidateWith64 == "" {
+	vPathMeta := meta.(*apidef.ValidatePathMeta)
+	fmt.Printf("%T: %+v\n", vPathMeta.ValidateWith, vPathMeta.ValidateWith)
+	if vPathMeta.ValidateWith == nil {
 		return errors.New("no schemas to validate against"), http.StatusInternalServerError
 	}
 
@@ -51,14 +51,11 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	}
 	defer rCopy.Body.Close()
 
-	schemaBytes, err := base64.StdEncoding.DecodeString(mmeta.ValidateWith64)
-	if err != nil {
-		return errors.New("unable to base64 decode schema"), http.StatusInternalServerError
-	}
+	schema := vPathMeta.ValidateWith
 
-	result, err := k.validate(bodyBytes, schemaBytes)
+	result, err := k.validate(bodyBytes, schema)
 	if err != nil {
-		return err, http.StatusUnprocessableEntity
+		return err, http.StatusInternalServerError
 	}
 
 	if !result.Valid() {
@@ -67,19 +64,19 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 			errStr = fmt.Sprintf("%s, %s", errStr, desc)
 		}
 
-		if mmeta.ValidationErrorResponseCode == 0 {
-			mmeta.ValidationErrorResponseCode = http.StatusUnprocessableEntity
+		if vPathMeta.ValidationErrorResponseCode == 0 {
+			vPathMeta.ValidationErrorResponseCode = http.StatusUnprocessableEntity
 		}
 
-		return errors.New(errStr), mmeta.ValidationErrorResponseCode
+		return errors.New(errStr), vPathMeta.ValidationErrorResponseCode
 	}
 
 	return nil, http.StatusOK
 }
 
-func (k *ValidateJSON) validate(input []byte, rules []byte) (*gojsonschema.Result, error) {
+func (k *ValidateJSON) validate(input []byte, schema map[string]interface{}) (*gojsonschema.Result, error) {
 	inputLoader := gojsonschema.NewBytesLoader(input)
-	rulesLoader := gojsonschema.NewBytesLoader(rules)
+	rulesLoader := gojsonschema.NewGoLoader(schema)
 
 	return gojsonschema.Validate(rulesLoader, inputLoader)
 }

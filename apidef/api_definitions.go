@@ -136,11 +136,9 @@ type MethodTransformMeta struct {
 }
 
 type ValidatePathMeta struct {
-	Path           string `bson:"path" json:"path"`
-	Method         string `bson:"method" json:"method"`
-	ValidateWith64 string `bson:"validate_with_64" json:"validate_with_64,omitempty"`
-	// TODO - Not implemented
-	//ValidateWithFile            string `bson:"validate_with_file" json:"validate_with_file,omitempty"`
+	Path         string                 `bson:"path" json:"path"`
+	Method       string                 `bson:"method" json:"method"`
+	ValidateWith map[string]interface{} `json:"validate_with"`
 	// Allows override of default 422 Unprocessible Entity response code for validation errors.
 	ValidationErrorResponseCode int `bson:"validation_error_response_code" json:"validation_error_response_code"`
 }
